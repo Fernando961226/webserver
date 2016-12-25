@@ -83,6 +83,45 @@ def rise4fun_send_metadata():
   data=metadata_json_printer.get_metadata()
   return data
 
+# this function runs the checker framework tool. 
+# this function is only used for the rise4fun website
+# this is function is ran when we click run in rise4fun.
+# More information can be found on http://www.rise4fun.com/dev.
+@route('/run')
+def rise4fun_run():
+  # run the java backedn by runnning a subprocess shell-scripts/run-checker.sh
+  java_backend = subprocess.Popen(['./shell-scripts/run-checker.sh', request.query.frontend_data.encode('utf8'),
+    cfPath, str(isRise4Fun)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  (stdout, stderr) = java_backend.communicate()
+
+  # if java_banckend.returncode !=0 and error occured
+  if java_backend.returncode != 0:
+    # print a message to understand what was the error.
+    print ("Error: CheckerPrinter failed %d %s %s" % (java_backend.returncode,stdout, stderr))
+
+
+    # return a message to rise4fun saying an error occured
+    # in order to do that we need to return a string following json format
+    # to see what the output should look like please look  at http://www.rise4fun.com/dev run.
+    verion =metadata_json_printer.get_specific('Version')
+    error_dict={ "Version": "1.0",
+  "Outputs": [
+    {
+      "MimeType": "text/x-web-markdown",
+      "Value": "Oops an error occurred"
+    },
+    {
+      "MimeType": "text/plain",
+      "Value": "Oops an error occurred"
+    }
+  ]}
+    result = json.dumps(error_dict)
+    return result
+  else:  
+    result = stdout
+  return result
+
+
 if __name__ == "__main__":
     run(host='127.0.0.1', port=8081, reloader=True)
     # run(host='0.0.0.0', port=8081, reloader=True) # make it externally visible - DANGER this is very insecure since there's no sandboxing!
