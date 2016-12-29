@@ -37,6 +37,7 @@ public class InMemory {
     List<String> checkerOptionsList;
     Printer checkerPrinter;
 
+    //TODO: make key as an enum class to ahcieve type safety
     static final Map<String, String> checkerMap;
     static {
         HashMap<String, String> tempMap = new HashMap<String, String>();
@@ -70,36 +71,83 @@ public class InMemory {
                 + "argd[1]: isRise4Fun, indicates whether should use Rise4FunPrinter";
             boolean isRise4Fun = Boolean.valueOf(args[1]);
             Printer checkerPrinter = null;
+            JsonObject data=null;
+            
+            // Get the data send by the website as a JsonObject.
+            // If we are unable to get the data, throw a IOException error and
+            // set the checkerPrinter Usercode to null and printException Internal IOException.
+            try {
+            data =Json.createReader(new InputStreamReader(System.in, "UTF-8")).readObject();
+            } 
+            catch (IOException e) {
+                checkerPrinter.setUsercode(null);
+                checkerPrinter.printException("Internal IOException");
+            }
+            
+           // If the data that we received is from rise4fun then we need to change the format of it 
+           // to make is work with our InMermory class and the make our checkerPrinter the Rise4FunPrinter.
             if(isRise4Fun) {
                 checkerPrinter = new Rise4FunPrinter();
+               
+                // Modify the data to meet the specification of the InMemory class.
+                data=rise4funModifyData(data);
+                
             } else {
                 checkerPrinter = new JsonPrinter();
             }
 
-        try {
-            new InMemory(Json.createReader(new InputStreamReader(System.in, "UTF-8")).readObject(), args[0],
-                    checkerPrinter);
-        } 
-        catch (IOException e) {
-            checkerPrinter.setUsercode(null);
-            checkerPrinter.printException("Internal IOException");
+      
+            new InMemory(data, args[0],checkerPrinter);
+         
+        
+    }
+    // Method purpose: to modify the data given by rise4fun in order to meet the requirements of the InMemory class.
+    // Input: JsonObject.
+    // Output: JsonObject.
+   static  protected JsonObject rise4funModifyData(JsonObject rise4funData)
+    {  
+	   // Get the value of the key "Source" inside the JsonObject rise4funData
+	   // and save it in the variable usercode as a String.
+	   String usercode =rise4funData.get("Source").toString();
+		
+	   // construct a new JsonObject containing the variable usercode, and and an options key 
+	   // containing the checker to be used.
+	   JsonObject data =Json.createObjectBuilder()
+    	        .add("usercode", usercode)
+    	        .add("options", Json.createObjectBuilder()
+    	        		.add("checker","nullness")
+    	        		.add("has_cfg", false)
+    	        		.add("verbose",false)).build();
+    	   return data;
+    }
+    
+    
+    
+    protected boolean initCheckerArgs(JsonObject optionsObject) {
+        String checkerKey = optionsObject.getString("checker");
+        List<String> options = new ArrayList<> ();
+
+        if (optionsObject.getBoolean("has_cfg")) {
+            // String cfgLevel = optionsObject.getString("cfg_level");
+            // options.add(cfgLevel);
+            // TODO: add CFG Visualization
         }
+        return initCheckerArgs(checkerKey, options.toArray(new String[options.size()]));
     }
 
-    protected boolean initCheckerArgs(JsonObject optionsObject) {
-        String checker = InMemory.checkerMap.get(optionsObject.getString("checker"));
-        if (checker == null) {
+    /**TODO: currently options still not been used. In future it is useful for extending cfg visualization
+    *
+    */
+    protected boolean initCheckerArgs(final String checkerKey, String... options) {
+        String checkerQualifiedName = InMemory.checkerMap.get(checkerKey);
+        if (checkerQualifiedName == null || checkerQualifiedName == "") {
             this.exceptionMsg = "Error: Cannot find indicated checker.";
             return false;
         }
         this.checkerOptionsList = Arrays.asList( "-Xbootclasspath/p:" +
                 this.CHECKER_FRAMEWORK + "/checker/dist/jdk8.jar",
                 "-processor",
-                checker);
-        if (optionsObject.getBoolean("has_cfg")) {
-            // String cfgLevel = optionsObject.getString("cfg_level");
-            // TODO: add CFG Visualization
-        }
+                checkerQualifiedName);
         return true;
     }
 
